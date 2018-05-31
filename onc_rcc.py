@@ -51,9 +51,9 @@ num_phases = len(phase_re)
 num_features = 5
 
 # Get data from csv and set up itk
-csv_file = open('./RCC_normalization_values_cc_onc.csv') 
+csv_file = open('./RCC_normalization_values.csv', 'rU') 
 csv_reader = csv.reader(csv_file)
-csv_dataframe = pd.read_csv('./RCC_normalization_values_cc_onc.csv',sep=',',index_col="SUBJECT ID")
+csv_dataframe = pd.read_csv('./RCC_normalization_values.csv',sep=',',index_col="SUBJECT ID")
 itk_reader = sitk.ImageSeriesReader()
 
 # Don't want header row
@@ -71,7 +71,7 @@ truth = numpy.zeros(num_samples)
 cache = True
 
 # Get all patient directory names
-data_dir = './data/'
+data_dir = '../data/'
 patients = []
 if os.path.isdir(data_dir):
     patients = os.listdir(data_dir)
@@ -88,7 +88,7 @@ for row in csv_reader:
     truth[i] = tumor_types[tumor_type]
 
     # Use feature cache if set to True and already cached
-    feature_cache_filename = './features/' + patient_id + '.npy'
+    feature_cache_filename = '../features/' + patient_id + '.npy'
     if cache and os.path.isfile(feature_cache_filename):
         features[i] = numpy.load(feature_cache_filename)
         i += 1
@@ -113,9 +113,9 @@ for row in csv_reader:
     phases = os.listdir(data_dir + patient_dir)
 
     j = 0
-    for phase_re, cortex in zip(phase_re, phase_type_csv):
+    for p_re, cortex in zip(phase_re, phase_type_csv):
         try:
-            phase_dir = filter(phase_re.match, phases)[0]
+            phase_dir = filter(p_re.match, phases)[0]
         except IndexError:
             print "Error: Phase "+ phase_dir +" is missing"
             break
@@ -145,7 +145,8 @@ for row in csv_reader:
         #find normalized cortex values to facilitate computation of relative enhancement
         normalized = 0
         if patient_id in csv_dataframe.index.values:
-            normalized = float(csv_dataframe.loc[patient_id, cortex])
+            normalized = csv_dataframe.loc[patient_id, cortex]
+            print normalized
         else:
             print 'Error: No normalized value for: ' + patient_id
             break
@@ -225,7 +226,7 @@ for row in csv_reader:
         # pylab.show()
         # j = j + 1
     if cache:
-        numpy.save('./features/'+ patient_id, features[i])
+        numpy.save('../features/'+ patient_id, features[i])
     i += 1
 
 print "ccRCC mean peak ROI relative attenuation: " + numpy.mean(features[truth == 1])
