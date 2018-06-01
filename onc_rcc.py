@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from sklearn import svm
 from sklearn.neural_network import MLPClassifier
 from sklearn.neighbors import KNeighborsClassifier
@@ -5,7 +6,7 @@ from sklearn.svm import SVC
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.gaussian_process.kernels import RBF
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, VotingClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.model_selection import StratifiedKFold
@@ -17,6 +18,7 @@ from scipy import interp, stats
 import SimpleITK as sitk, numpy, scipy.io, scipy.ndimage, pylab, os, re, csv, math
 import matplotlib.pyplot as plt, pandas as pd
 
+# Taken from https://www.hdm-stuttgart.de/~maucher/Python/MMCodecs/html/basicFunctions.html
 def entropy(signal):
         '''
         function returns entropy of a signal
@@ -48,15 +50,16 @@ tumor_types = { 'oncocytoma': 0, 'Clear Cell RCC': 1 }
 
 num_phases = len(phase_re)
 
+# Be sure to update this if change features
 num_features = 5
 
 # Get data from csv and set up itk
 csv_file = open('./RCC_normalization_values.csv', 'rU') 
 csv_reader = csv.reader(csv_file)
-csv_dataframe = pd.read_csv('./RCC_normalization_values.csv',sep=',',index_col="SUBJECT ID")
+csv_dataframe = pd.read_csv('./RCC_normalization_values.csv', sep = ',', index_col = "SUBJECT ID")
 itk_reader = sitk.ImageSeriesReader()
 
-# Don't want header row
+# Don't want header row (https://stackoverflow.com/questions/16108526/count-how-many-lines-are-in-a-csv-python)
 num_samples = sum(1 for row in csv_reader) - 1
 
 # Go back to start of file
@@ -80,9 +83,10 @@ else:
     exit()
 
 
- 
+# Used to keep track of feature numpy arrays
 i = 0
 for row in csv_reader:
+    # Get tumor type, patient id, and record ground truth for each patient
     tumor_type = row[0]
     patient_id = row[1]
     truth[i] = tumor_types[tumor_type]
@@ -97,11 +101,6 @@ for row in csv_reader:
     # Otherwise calculate features for patient
 
     # Match patient_id with patient data folder
-
-
-    # BEWARE THAT PATIENT ID PROBABLY HAS DATE ALONG WITH IT???
-    
-
     patient_re = re.compile('.*' + patient_id + '.*')
     try:
         patient_dir = filter(patient_re.match, patients)[0]
@@ -178,7 +177,7 @@ for row in csv_reader:
                             acc.append(masked_img_arr[_z][_y][_x])
             
             # Check if we found a new max intesity ROI
-            if valid and len(acc) >= 9*(min(end - start, 3)) and len(acc) != 0:
+            if valid and len(acc) >= 9 * (min(end - start, 3)) and len(acc) != 0:
                 avg = numpy.mean(numpy.asarray(acc))
                 if avg > max_roi:
                     max_roi = avg
@@ -234,53 +233,74 @@ print "Oncocytoma mean peak ROI relative attenuation:" + str(numpy.mean(features
 print "Training..... :)"
 
 classifiers = {
-    "K Nearest Neighbors": KNeighborsClassifier(17),
-    "SVC (Linear Kernel)": SVC(kernel="linear", C=0.01,probability=True),
-    "SVC": SVC(C=0.01,probability=True),
+    "K Nearest Neighbors": KNeighborsClassifier(n_neighbors = 7, algorithm = "auto"),
+    "SVC (Linear Kernel)": SVC(kernel="linear", C=0.01, probability = True),
+    "SVC": SVC(C = 0.01, probability = True),
     "Gaussian Process": GaussianProcessClassifier(1.0 * RBF(1.0), warm_start=True),
-    "Decision Tree": DecisionTreeClassifier(max_depth=1),
-    "Random Forest": RandomForestClassifier(max_depth=2, n_estimators=3),
-    "Multi-layer Perception": MLPClassifier(hidden_layer_sizes=(15,15,),alpha=0.1,activation='tanh',solver='lbfgs'),
+    "Decision Tree": DecisionTreeClassifier(max_depth = 1),
+    "Random Forest": RandomForestClassifier(max_depth = 2, n_estimators = 5),
+    "Multi-layer Perception": MLPClassifier(hidden_layer_sizes=(15,15,), alpha = 0.1, activation = 'tanh', solver = 'lbfgs'),
     "AdaBoost": AdaBoostClassifier(),
     "Gaussian Naive-bayes": GaussianNB(),
-    # "Quadratic Discriminant Analysis": QuadraticDiscriminantAnalysis(),
+    # Using Voting Classifier to perform majority vote of best performing classifiers
+    "Voting Classifier": VotingClassifier(
+        estimators = [
+            ("K Nearest Neighbors", KNeighborsClassifier(n_neighbors = 7, algorithm = "auto")),
+            ("SVC (Linear Kernel)", SVC(kernel = "linear", C = 0.01, probability=True)),
+            ( "SVC", SVC(C = 0.01, probability = True)),
+            #("Gaussian Process", GaussianProcessClassifier(1.0 * RBF(1.0), warm_start=True)),
+            ("Decision Tree", DecisionTreeClassifier(max_depth = 1)),
+            ("Random Forest", RandomForestClassifier(max_depth = 2, n_estimators = 5)),
+            ("Multi-layer Perception", MLPClassifier(hidden_layer_sizes=(15, 15, ), alpha = 0.1, activation='tanh', solver='lbfgs')),
+            #("AdaBoost", AdaBoostClassifier()),
+            ("Gaussian Naive-bayes", GaussianNB()),
+        ], voting = 'soft', flatten_transform = True)
 }
 
 
-crossValidator = StratifiedKFold(n_splits=10)
-colors = cycle(['cyan', 'indigo', 'seagreen', 'yellow', 'blue', 'darkorange','red','magenta','pink','purple','teal'])
+crossValidator = StratifiedKFold(n_splits = 6)
+colors = cycle(['green', 'orange', 'blue', 'red', 'purple', 'brown'])
 
 for classifier in classifiers:
     # ROC evaluation with cross validation taken from scikit-learn
     # http://scikit-learn.org/stable/auto_examples/model_selection/plot_roc_crossval.html#sphx-glr-auto-examples-model-selection-plot-roc-crossval-py
     i = 0
-    mean_tpr = 0.0
+    tprs = []
+    aucs = []
     mean_fpr = numpy.linspace(0,1,100)
-    print "Training " + classifier + "..."
+    print "Training " + classifier
     for (train, test), color in zip(crossValidator.split(features,truth), colors):
         probs = classifiers[classifier].fit(features[train], truth[train]).predict_proba(features[test])
         
         # Get ROC curve
         fpr, tpr, thresholds = roc_curve(truth[test], probs[:,1])
-        mean_tpr += interp(mean_fpr, fpr, tpr)
-        mean_tpr[0] = 0.0
-        area_under_curve = auc(fpr,tpr)
-        #plt.plot(fpr, tpr, lw=2, color=color, label='ROC fold %d (area = %0.2f)' % (i, area_under_curve))
-        i = i + 1
-    plt.plot([0, 1], [0, 1], linestyle='--', lw=2, color='k', label='Luck')
+        tprs.append(interp(mean_fpr, fpr, tpr))
+        tprs[-1][0] = 0.0
+        roc_auc = auc(fpr,tpr)
+        aucs.append(roc_auc)
+        plt.plot(fpr, tpr, lw = 2, alpha = 0.4, color = color, label='Fold: %d (AUC = %0.2f)' % (i, roc_auc))
+        i += 1
     
-    print "Results for " + classifier + " (opens in new window):"
+    print "Graph for " + classifier + ":"
     
-    # Do final stats changes
-    mean_tpr /= crossValidator.get_n_splits(features, truth)
+    # Final alterations before plotting
+    mean_tpr = numpy.mean(tprs, axis = 0)
     mean_tpr[-1] = 1.0
     mean_auc = auc(mean_fpr, mean_tpr)
-    plt.plot(mean_fpr, mean_tpr, color='g', linestyle='--', label='Mean ROC (area = %0.2f)' % mean_auc, lw=2)
+    std_auc = numpy.std(aucs)
+    
+    std_tpr = numpy.std(tprs, axis = 0)
+    tprs_upper = numpy.minimum(mean_tpr + std_tpr, 1)
+    tprs_lower = numpy.maximum(mean_tpr - std_tpr, 0)
+
+    plt.plot([0, 1], [0, 1], alpha = 0.8, linestyle='--', lw = 2, color = 'black', label = 'Luck')
+    plt.fill_between(mean_fpr, tprs_lower, tprs_upper, color='grey', alpha=.2, label=r'$\pm$ 1 std. dev.')
+    plt.plot(mean_fpr, mean_tpr, color='darkblue', linestyle='--', label='Mean ROC (AUC = %0.2f %s %0.2f)' % (mean_auc, u'±', std_auc), lw = 4)
     plt.xlim([-0.05, 1.05])
     plt.ylim([-0.05, 1.05])
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.title('ROC for ' + classifier + '\n Oncocytoma vs. Clear Cell RCC')
-    plt.legend(loc="lower right")
-    plt.subplots_adjust(top=0.85)
+    plt.legend(loc = "lower right")
+    plt.subplots_adjust(top = 0.85)
     plt.show()
