@@ -146,7 +146,6 @@ for row in csv_reader:
         normalized = 0
         if patient_id in csv_dataframe.index.values:
             normalized = csv_dataframe.loc[patient_id, cortex]
-            print normalized
         else:
             print 'Error: No normalized value for: ' + patient_id
             break
@@ -229,8 +228,8 @@ for row in csv_reader:
         numpy.save('../features/'+ patient_id, features[i])
     i += 1
 
-print "ccRCC mean peak ROI relative attenuation: " + numpy.mean(features[truth == 1])
-print "Oncocytoma mean peak ROI relative attenuation:" + numpy.mean(features[truth == 0])
+print "ccRCC mean peak ROI relative attenuation: " + str(numpy.mean(features[truth == 1]))
+print "Oncocytoma mean peak ROI relative attenuation:" + str(numpy.mean(features[truth == 0]))
 
 print "Training..... :)"
 
@@ -244,7 +243,7 @@ classifiers = {
     "Multi-layer Perception": MLPClassifier(hidden_layer_sizes=(15,15,),alpha=0.1,activation='tanh',solver='lbfgs'),
     "AdaBoost": AdaBoostClassifier(),
     "Gaussian Naive-bayes": GaussianNB(),
-    "Quadratic Discriminant Analysis": QuadraticDiscriminantAnalysis()
+    # "Quadratic Discriminant Analysis": QuadraticDiscriminantAnalysis(),
 }
 
 
