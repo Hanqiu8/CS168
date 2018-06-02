@@ -6,10 +6,10 @@ from sklearn.svm import SVC
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.gaussian_process.kernels import RBF
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, VotingClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier, VotingClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit, GridSearchCV
 from sklearn.metrics import roc_curve, auc
 
 from itertools import cycle
@@ -111,7 +111,6 @@ for row in csv_reader:
     # Get 4 phases for patient
     phases = os.listdir(data_dir + patient_dir)
 
-    j = 0
     for p_re, cortex in zip(phase_re, phase_type_csv):
         try:
             phase_dir = filter(p_re.match, phases)[0]
@@ -214,15 +213,6 @@ for row in csv_reader:
         features[i][j + num_phases * 4] = scipy.stats.iqr(flat_img_arr)
         print features[i][j + num_phases * 4]
         
-        # Debugging code to display images side by side
-        # f = pylab.figure()
-        # f.add_subplot(1,2,1)
-        # pylab.imshow(img[start + 2],cmap=pylab.cm.bone)
-        # f.add_subplot(1,2,2)
-        # pylab.imshow(masked_img_arr[start + 2],cmap=pylab.cm.bone)
-        # print "Slice "+str(start+2)
-        # pylab.show()
-        # j = j + 1
     if cache:
         numpy.save('../features/'+ patient_id, features[i])
     i += 1
@@ -230,36 +220,41 @@ for row in csv_reader:
 print "ccRCC mean peak ROI relative attenuation: " + str(numpy.mean(features[truth == 1]))
 print "Oncocytoma mean peak ROI relative attenuation:" + str(numpy.mean(features[truth == 0]))
 
-print "Training..... :)"
+print "Training"
+
+# Could use GridSearchCV to pick params for each
 
 classifiers = {
     "K Nearest Neighbors": KNeighborsClassifier(n_neighbors = 7, algorithm = "auto"),
-    "SVC (Linear Kernel)": SVC(kernel="linear", C=0.01, probability = True),
+    "SVC (Linear Kernel)": SVC(kernel = "linear", C = 0.01, probability = True),
     "SVC": SVC(C = 0.01, probability = True),
-    "Gaussian Process": GaussianProcessClassifier(1.0 * RBF(1.0), warm_start=True),
+    "Gaussian Process": GaussianProcessClassifier(1.0 * RBF(1.0), warm_start = True),
     "Decision Tree": DecisionTreeClassifier(max_depth = 1),
-    "Random Forest": RandomForestClassifier(max_depth = 2, n_estimators = 5),
-    "Multi-layer Perception": MLPClassifier(hidden_layer_sizes=(15,15,), alpha = 0.1, activation = 'tanh', solver = 'lbfgs'),
-    "AdaBoost": AdaBoostClassifier(),
+    "Random Forest": RandomForestClassifier(max_depth = 2, n_estimators = 5, random_state = 1),
+    "Multi-layer Perception": MLPClassifier(hidden_layer_sizes = (15,15,), alpha = 0.1, activation = 'tanh', solver = 'lbfgs'),
+    "AdaBoost": AdaBoostClassifier(n_estimators = 5),
     "Gaussian Naive-bayes": GaussianNB(),
-    # Using Voting Classifier to perform majority vote of best performing classifiers
+    "Gradient Boosting": GradientBoostingClassifier(n_estimators = 10, learning_rate = 1.0, max_depth = 1, random_state = 0),
+    # Using Voting Classifier to perform majority vote
     "Voting Classifier": VotingClassifier(
         estimators = [
             ("K Nearest Neighbors", KNeighborsClassifier(n_neighbors = 7, algorithm = "auto")),
-            ("SVC (Linear Kernel)", SVC(kernel = "linear", C = 0.01, probability=True)),
+            ("SVC (Linear Kernel)", SVC(kernel = "linear", C = 0.01, probability = True)),
             ( "SVC", SVC(C = 0.01, probability = True)),
-            #("Gaussian Process", GaussianProcessClassifier(1.0 * RBF(1.0), warm_start=True)),
+            ("Gaussian Process", GaussianProcessClassifier(1.0 * RBF(1.0), warm_start=True)),
             ("Decision Tree", DecisionTreeClassifier(max_depth = 1)),
-            ("Random Forest", RandomForestClassifier(max_depth = 2, n_estimators = 5)),
-            ("Multi-layer Perception", MLPClassifier(hidden_layer_sizes=(15, 15, ), alpha = 0.1, activation='tanh', solver='lbfgs')),
-            #("AdaBoost", AdaBoostClassifier()),
+            ("Random Forest", RandomForestClassifier(max_depth = 2, n_estimators = 5, random_state = 1)),
+            ("Multi-layer Perception", MLPClassifier(hidden_layer_sizes = (15, 15, ), alpha = 0.1, activation = 'tanh', solver = 'lbfgs')),
+            ("AdaBoost", AdaBoostClassifier(n_estimators = 5)),
             ("Gaussian Naive-bayes", GaussianNB()),
+            ("Gradient Boosting", GradientBoostingClassifier(n_estimators = 10, learning_rate = 1.0, max_depth = 1, random_state = 0)),
         ], voting = 'soft', flatten_transform = True)
 }
 
-
-crossValidator = StratifiedKFold(n_splits = 6)
-colors = cycle(['green', 'orange', 'blue', 'red', 'purple', 'brown'])
+# Ensure each fold has its own color
+# Can try StratifiedShuffleSplit instead
+cv = StratifiedKFold(n_splits = 5)
+colors = cycle(['green', 'orange', 'blue', 'red'])
 
 for classifier in classifiers:
     # ROC evaluation with cross validation taken from scikit-learn
@@ -269,7 +264,8 @@ for classifier in classifiers:
     aucs = []
     mean_fpr = numpy.linspace(0,1,100)
     print "Training " + classifier
-    for (train, test), color in zip(crossValidator.split(features,truth), colors):
+    for (train, test), color in zip(cv.split(features,truth), colors):
+        # print "# Train # Test: " + str(len(train)), str(len(test))
         probs = classifiers[classifier].fit(features[train], truth[train]).predict_proba(features[test])
         
         # Get ROC curve
