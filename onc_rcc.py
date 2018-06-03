@@ -53,7 +53,7 @@ tumor_types = { 'oncocytoma': 0, 'Clear Cell RCC': 1 }
 num_phases = len(phase_re)
 
 # Be sure to update this if change features
-num_features = 5
+num_features = 6
 
 # Get data from csv and set up itk
 csv_file = open('./RCC_normalization_values.csv', 'rU') 
@@ -199,21 +199,29 @@ for row in csv_reader:
         features[i][j] = max_roi
         print features[i][j], "%"
         
-        print "#2 - Standard deviation:",
-        features[i][j + num_phases * 1] = numpy.std(flat_img_arr)
+        print "#2 - Entropy:",
+        features[i][j + num_phases * 1] = entropy(flat_img_arr)
         print features[i][j + num_phases * 1]
         
-        print "#3 - Entropy:",
-        features[i][j + num_phases * 2] = entropy(flat_img_arr)
+        print "#3 - Standard deviation:",
+        features[i][j + num_phases * 2] = numpy.std(flat_img_arr)
         print features[i][j + num_phases * 2]
         
-        print "#4 - Kurtosis:",
-        features[i][j + num_phases * 3] = scipy.stats.kurtosis(flat_img_arr)
+        print "#4 - Inter-quartile range:",
+        features[i][j + num_phases * 3] = scipy.stats.iqr(flat_img_arr)
         print features[i][j + num_phases * 3]
         
-        print "#5 - Inter-quartile range:",
-        features[i][j + num_phases * 4] = scipy.stats.iqr(flat_img_arr)
+        print "#5 - Kurtosis:",
+        features[i][j + num_phases * 4] = scipy.stats.kurtosis(flat_img_arr)
         print features[i][j + num_phases * 4]
+
+        print "#6 - Skew:",
+        features[i][j + num_phases * 5] = scipy.stats.skew(flat_img_arr)
+        print features[i][j + num_phases * 5]
+
+        # print "#7 - 2nd Statistic:",
+        # features[i][j + num_phases * 6] = scipy.stats.kstat(flat_img_arr)
+        # print features[i][j + num_phases * 6]
 
         j += 1
         
