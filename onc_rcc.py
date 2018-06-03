@@ -11,10 +11,8 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit, GridSearchCV
 from sklearn.metrics import roc_curve, auc
-
 from itertools import cycle
 from scipy import interp, stats
-
 import SimpleITK as sitk, numpy, scipy.io, scipy.ndimage, pylab, os, re, csv, math
 import matplotlib.pyplot as plt, pandas as pd
 
@@ -42,12 +40,16 @@ phase_re = [
     re.compile('.*Excret.*')
 ]
 
+# Save path to feature folder
+features_path = '../features/'
+
 # Phase names used in csv
 phase_type_csv = [ 'Pre-contrast CORTEX', 'Corticomedullary CORTEX', 'Nephrtographic CORTEX', 'Excretory CORTEX' ]
 
 # Tumor types in csv to binary
 tumor_types = { 'oncocytoma': 0, 'Clear Cell RCC': 1 }
 
+# Number of phases we use to train
 num_phases = len(phase_re)
 
 # Be sure to update this if change features
@@ -92,7 +94,7 @@ for row in csv_reader:
     truth[i] = tumor_types[tumor_type]
 
     # Use feature cache if set to True and already cached
-    feature_cache_filename = '../features/' + patient_id + '.npy'
+    feature_cache_filename = features_path + patient_id + '.npy'
     if cache and os.path.isfile(feature_cache_filename):
         features[i] = numpy.load(feature_cache_filename)
         i += 1
@@ -110,12 +112,12 @@ for row in csv_reader:
    
     # Get 4 phases for patient
     phases = os.listdir(data_dir + patient_dir)
-
+    j = 0
     for p_re, cortex in zip(phase_re, phase_type_csv):
         try:
             phase_dir = filter(p_re.match, phases)[0]
         except IndexError:
-            print "Error: Phase "+ phase_dir +" is missing"
+            print "Error: Phase " + phase_dir + " is missing"
             break
         
         # Use mask from .mha file
@@ -183,7 +185,7 @@ for row in csv_reader:
                     roi = numpy.asarray(acc[:])
 
         if max_roi != -float('inf'):
-            max_roi = (max_roi - normalized)/ normalized * 100
+            max_roi = (max_roi - normalized) / normalized * 100
         else:
             # If this failed somehow take 90th percentile and normalize
             max_roi = (numpy.percentile(flat_img_arr, 90) - normalized) / normalized * 100
@@ -212,9 +214,11 @@ for row in csv_reader:
         print "#5 - Inter-quartile range:",
         features[i][j + num_phases * 4] = scipy.stats.iqr(flat_img_arr)
         print features[i][j + num_phases * 4]
+
+        j += 1
         
     if cache:
-        numpy.save('../features/'+ patient_id, features[i])
+        numpy.save(features_path + patient_id, features[i])
     i += 1
 
 print "ccRCC mean peak ROI relative attenuation: " + str(numpy.mean(features[truth == 1]))
@@ -254,7 +258,7 @@ classifiers = {
 # Ensure each fold has its own color
 # Can try StratifiedShuffleSplit instead
 cv = StratifiedKFold(n_splits = 5)
-colors = cycle(['green', 'orange', 'blue', 'red'])
+colors = cycle(['green', 'orange', 'blue', 'red', 'brown'])
 
 for classifier in classifiers:
     # ROC evaluation with cross validation taken from scikit-learn
