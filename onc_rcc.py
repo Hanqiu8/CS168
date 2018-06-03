@@ -285,13 +285,15 @@ for classifier in classifiers:
     mean_auc = auc(mean_fpr, mean_tpr)
     std_auc = numpy.std(aucs)
     
+    # Graph shows 95% confidence interval in grey
     std_tpr = numpy.std(tprs, axis = 0)
-    tprs_upper = numpy.minimum(mean_tpr + std_tpr, 1)
-    tprs_lower = numpy.maximum(mean_tpr - std_tpr, 0)
-
+    tprs_upper = numpy.minimum(mean_tpr + 2 * std_tpr, 1)
+    tprs_lower = numpy.maximum(mean_tpr - 2 * std_tpr, 0)
+    
+    plt.fill_between(mean_fpr, tprs_lower, tprs_upper, color = 'grey', alpha = .2, label = '95% Confidence Interval')
+    plt.plot([], [], color='green', linewidth=10)
     plt.plot([0, 1], [0, 1], alpha = 0.8, linestyle='--', lw = 2, color = 'black', label = 'Luck')
-    plt.fill_between(mean_fpr, tprs_lower, tprs_upper, color='grey', alpha=.2, label=r'$\pm$ 1 std. dev.')
-    plt.plot(mean_fpr, mean_tpr, color='darkblue', linestyle='--', label='Mean ROC (AUC = %0.2f %s %0.2f)' % (mean_auc, u'±', std_auc), lw = 4)
+    plt.plot(mean_fpr, mean_tpr, color='darkblue', linestyle='--', label='Mean ROC (AUC = %0.2f %s %0.2f)' % (mean_auc, u'±', 2 * std_auc), lw = 4)
     plt.xlim([-0.05, 1.05])
     plt.ylim([-0.05, 1.05])
     plt.xlabel('False Positive Rate')
