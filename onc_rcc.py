@@ -34,10 +34,10 @@ mha_re = re.compile('.*mha$')
 
 # Regex for each phase
 phase_re = [
-    re.compile('.*Pre-Contrast.*'),
-    re.compile('.*Coricomedullary.*'),
-    re.compile('.*Nephrographic.*'),
-    re.compile('.*Excret.*')
+    re.compile('.*Pre-contrast.*'),
+    re.compile('.*Corticomedullary.*'),
+    re.compile('.*Nephrtographic.*'),
+    re.compile('.*Excretory.*')
 ]
 
 # Save path to feature folder
@@ -68,7 +68,7 @@ num_samples = sum(1 for row in csv_reader) - 1
 csv_file.seek(0) 
 csv_reader.next()
 
-# Set up features and ground truth
+# Set up features and ground truth numpy arrays
 features = numpy.zeros((num_samples, num_phases * num_features))
 truth = numpy.zeros(num_samples)
 
@@ -86,18 +86,18 @@ else:
 
 
 # Used to keep track of feature numpy arrays
-i = 0
+patient_index = 0
 for row in csv_reader:
     # Get tumor type, patient id, and record ground truth for each patient
     tumor_type = row[0]
     patient_id = row[1]
-    truth[i] = tumor_types[tumor_type]
+    truth[patient_index] = tumor_types[tumor_type]
 
     # Use feature cache if set to True and already cached
-    feature_cache_filename = features_path + patient_id + '.npy'
-    if cache and os.path.isfile(feature_cache_filename):
-        features[i] = numpy.load(feature_cache_filename)
-        i += 1
+    cache_filename = features_path + patient_id + '.npy'
+    if cache and os.path.isfile(cache_filename):
+        features[i] = numpy.load(cache_filename)
+        patient_index += 1
         continue
 
     # Otherwise calculate features for patient
@@ -112,7 +112,7 @@ for row in csv_reader:
    
     # Get 4 phases for patient
     phases = os.listdir(data_dir + patient_dir)
-    j = 0
+    phase_index = 0
     for p_re, cortex in zip(phase_re, phase_type_csv):
         try:
             phase_dir = filter(p_re.match, phases)[0]
@@ -196,38 +196,38 @@ for row in csv_reader:
         print "Features - " + tumor_type + ":"
         
         print "#1 - Peak ROI relative intensity:",
-        features[i][j] = max_roi
-        print features[i][j], "%"
+        features[patient_index][phase_index] = max_roi
+        print features[i][phase_index], "%"
         
         print "#2 - Entropy:",
-        features[i][j + num_phases * 1] = entropy(flat_img_arr)
-        print features[i][j + num_phases * 1]
+        features[patient_index][phase_index + num_phases * 1] = entropy(flat_img_arr)
+        print features[patient_index][phase_index + num_phases * 1]
         
         print "#3 - Standard deviation:",
-        features[i][j + num_phases * 2] = numpy.std(flat_img_arr)
-        print features[i][j + num_phases * 2]
+        features[patient_index][phase_index + num_phases * 2] = numpy.std(flat_img_arr)
+        print features[patient_index][phase_index + num_phases * 2]
         
         print "#4 - Inter-quartile range:",
-        features[i][j + num_phases * 3] = scipy.stats.iqr(flat_img_arr)
-        print features[i][j + num_phases * 3]
+        features[patient_index][phase_index + num_phases * 3] = scipy.stats.iqr(flat_img_arr)
+        print features[patient_index][phase_index + num_phases * 3]
         
         print "#5 - Kurtosis:",
-        features[i][j + num_phases * 4] = scipy.stats.kurtosis(flat_img_arr)
-        print features[i][j + num_phases * 4]
+        features[patient_index][phase_index + num_phases * 4] = scipy.stats.kurtosis(flat_img_arr)
+        print features[patient_index][phase_index + num_phases * 4]
 
         print "#6 - Skew:",
-        features[i][j + num_phases * 5] = scipy.stats.skew(flat_img_arr)
-        print features[i][j + num_phases * 5]
+        features[patient_index][phase_index + num_phases * 5] = scipy.stats.skew(flat_img_arr)
+        print features[patient_index][phase_index + num_phases * 5]
 
         # print "#7 - 2nd Statistic:",
-        # features[i][j + num_phases * 6] = scipy.stats.kstat(flat_img_arr)
-        # print features[i][j + num_phases * 6]
+        # features[patient_index][phase_index + num_phases * 6] = scipy.stats.kstat(flat_img_arr)
+        # print features[patient_index][phase_index + num_phases * 6]
 
-        j += 1
+        phase_index += 1
         
     if cache:
         numpy.save(features_path + patient_id, features[i])
-    i += 1
+    patient_index += 1
 
 print "ccRCC mean peak ROI relative attenuation: " + str(numpy.mean(features[truth == 1]))
 print "Oncocytoma mean peak ROI relative attenuation:" + str(numpy.mean(features[truth == 0]))
