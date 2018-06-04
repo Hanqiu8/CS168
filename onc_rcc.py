@@ -11,12 +11,21 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit, GridSearchCV
 from sklearn.metrics import roc_curve, auc
+from skimage import exposure, feature, measure
+from skimage.morphology import disk
+from skimage.filters import rank, gabor_kernel
+from skimage import color, data, restoration
+
+import pydicom
+
 
 from itertools import cycle
+from scipy import ndimage as ndi
 from scipy import interp, stats
 
 import SimpleITK as sitk, numpy, scipy.io, scipy.ndimage, pylab, os, re, csv, math
 import matplotlib.pyplot as plt, pandas as pd
+import numpy as np
 
 # Taken from https://www.hdm-stuttgart.de/~maucher/Python/MMCodecs/html/basicFunctions.html
 def entropy(signal):
@@ -30,6 +39,14 @@ def entropy(signal):
         propab=[numpy.size(signal[signal==i])/(1.0*lensig) for i in symset]
         ent=numpy.sum([p*numpy.log2(1.0/p) for p in propab])
         return ent
+
+def compute_feats(image, kernels):
+    feats = np.zeros((len(kernels), 2), dtype=np.double)
+    for k, kernel in enumerate(kernels):
+        filtered = ndi.convolve(image, kernel, mode='wrap')
+        feats[k, 0] = filtered.mean()
+        feats[k, 1] = filtered.var()
+    return feats
 
 # Regex for mha files
 mha_re = re.compile('.*mha$')
@@ -61,8 +78,6 @@ itk_reader = sitk.ImageSeriesReader()
 
 # Don't want header row (https://stackoverflow.com/questions/16108526/count-how-many-lines-are-in-a-csv-python)
 num_samples = sum(1 for row in csv_reader) - 1
-
-# Go back to start of file
 csv_file.seek(0) 
 csv_reader.next()
 
@@ -70,12 +85,12 @@ csv_reader.next()
 features = numpy.zeros((num_samples, num_phases * num_features))
 truth = numpy.zeros(num_samples)
 
-# Decides whether or not to use feature cache
+# Use feature cache
 cache = True
 
 # Get all patient directory names
-data_dir = '../data/'
-patients = []
+data_dir = '/media/hansen/Data/data/'
+patients = []   
 if os.path.isdir(data_dir):
     patients = os.listdir(data_dir)
 else:
@@ -92,7 +107,7 @@ for row in csv_reader:
     truth[i] = tumor_types[tumor_type]
 
     # Use feature cache if set to True and already cached
-    feature_cache_filename = '../features/' + patient_id + '.npy'
+    feature_cache_filename = './featuresLocEqu/' + patient_id + '.npy'
     if cache and os.path.isfile(feature_cache_filename):
         features[i] = numpy.load(feature_cache_filename)
         i += 1
@@ -111,6 +126,7 @@ for row in csv_reader:
     # Get 4 phases for patient
     phases = os.listdir(data_dir + patient_dir)
 
+    j=0
     for p_re, cortex in zip(phase_re, phase_type_csv):
         try:
             phase_dir = filter(p_re.match, phases)[0]
@@ -139,6 +155,37 @@ for row in csv_reader:
         
         # Flip z axis for DICOM
         img = numpy.flipud(sitk.GetArrayFromImage(itk_reader.Execute()))
+        img_rescale = img  
+        
+        from scipy.signal import convolve2d as conv2
+        # img = color.rgb2gray(img)
+        # psf = np.ones((10,10))/100
+        # imgd = conv2(img[0], psf, 'same')
+        # imgd += 0.1 * imgd.std() * np.random.standard_normal(imgd.shape)
+        # deconvolved, _ = restoration.unsupervised_wiener(imgd, psf)
+
+        pylab.imshow(img[24], cmap=pylab.cm.bone)
+        pylab.show()
+        kernels = []
+        for theta in range(4):
+            theta = theta / 4. * np.pi
+            for sigma in (1, 3):
+                for frequency in (0.05, 0.25):
+                    kernel = np.real(gabor_kernel(frequency, theta=theta, sigma_x=sigma, sigma_y=sigma))
+                    kernels.append(kernel)
+        # print img
+        # for i in range(len(img)):
+        #     img[i] = measure.find_contours(img[i], 0.8)
+        
+
+
+
+        # Global Histogram Equalization
+        # img_rescale = exposure.equalize_hist(img)
+        # selem = disk(30)
+        # img_rescale = rank.equalize(img, selem = selem)
+
+        # feats = compute_feats(ndi.rotate(img, angle=190, reshape=True), kernels)
 
         #find normalized cortex values to facilitate computation of relative enhancement
         normalized = 0
@@ -155,9 +202,16 @@ for row in csv_reader:
         print "Lesion: "+ str(start) + "-" + str(end)
 
         # Segment lesion
-        masked_img_arr = numpy.multiply(img, mask)
-        flat_img_arr = numpy.ndarray.flatten(img[mask!=0])
+        masked_img_arr = numpy.multiply(img_rescale, mask)
 
+        # psf = np.ones((10,10))/100
+        # imgd = conv2(img[0], psf, 'same')
+        # imgd += 0.1 * imgd.std() * np.random.standard_normal(imgd.shape)
+        # deconvolved, _ = restoration.unsupervised_wiener(imgd, psf)
+
+       
+        flat_img_arr = numpy.ndarray.flatten(img_rescale[mask!=0])
+       
         #extract 3x3x3 ROI with max intensity
         max_roi = -float('inf')
         roi = []
@@ -214,7 +268,7 @@ for row in csv_reader:
         print features[i][j + num_phases * 4]
         
     if cache:
-        numpy.save('../features/'+ patient_id, features[i])
+        numpy.save('./featuresLocEqu/'+ patient_id, features[i])
     i += 1
 
 print "ccRCC mean peak ROI relative attenuation: " + str(numpy.mean(features[truth == 1]))
