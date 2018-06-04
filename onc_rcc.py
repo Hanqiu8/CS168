@@ -11,6 +11,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit, GridSearchCV
 from sklearn.metrics import roc_curve, auc
+
 from skimage import exposure, feature, measure
 from skimage.morphology import disk
 from skimage.filters import rank, gabor_kernel
@@ -18,11 +19,9 @@ from skimage import color, data, restoration
 
 import pydicom
 
-
 from itertools import cycle
 from scipy import ndimage as ndi
 from scipy import interp, stats
-
 import SimpleITK as sitk, numpy, scipy.io, scipy.ndimage, pylab, os, re, csv, math
 import matplotlib.pyplot as plt, pandas as pd
 import numpy as np
@@ -53,11 +52,14 @@ mha_re = re.compile('.*mha$')
 
 # Regex for each phase
 phase_re = [
-    re.compile('.*Pre-Contrast.*'),
-    re.compile('.*Coricomedullary.*'),
-    re.compile('.*Nephrographic.*'),
-    re.compile('.*Excret.*')
+    re.compile('.*Pre-contrast.*'),
+    re.compile('.*Corticomedullary.*'),
+    re.compile('.*Nephrtographic.*'),
+    re.compile('.*Excretory.*')
 ]
+
+# Save path to feature folder
+features_path = '../features/'
 
 # Phase names used in csv
 phase_type_csv = [ 'Pre-contrast CORTEX', 'Corticomedullary CORTEX', 'Nephrtographic CORTEX', 'Excretory CORTEX' ]
@@ -65,10 +67,11 @@ phase_type_csv = [ 'Pre-contrast CORTEX', 'Corticomedullary CORTEX', 'Nephrtogra
 # Tumor types in csv to binary
 tumor_types = { 'oncocytoma': 0, 'Clear Cell RCC': 1 }
 
+# Number of phases we use to train
 num_phases = len(phase_re)
 
 # Be sure to update this if change features
-num_features = 5
+num_features = 6
 
 # Get data from csv and set up itk
 csv_file = open('./RCC_normalization_values.csv', 'rU') 
@@ -81,7 +84,7 @@ num_samples = sum(1 for row in csv_reader) - 1
 csv_file.seek(0) 
 csv_reader.next()
 
-# Set up features and ground truth
+# Set up features and ground truth numpy arrays
 features = numpy.zeros((num_samples, num_phases * num_features))
 truth = numpy.zeros(num_samples)
 
@@ -99,19 +102,27 @@ else:
 
 
 # Used to keep track of feature numpy arrays
-i = 0
+patient_index = 0
 for row in csv_reader:
     # Get tumor type, patient id, and record ground truth for each patient
     tumor_type = row[0]
     patient_id = row[1]
-    truth[i] = tumor_types[tumor_type]
+    truth[patient_index] = tumor_types[tumor_type]
 
     # Use feature cache if set to True and already cached
+# <<<<<<< HEAD
     feature_cache_filename = './featuresLocEqu/' + patient_id + '.npy'
     if cache and os.path.isfile(feature_cache_filename):
-        features[i] = numpy.load(feature_cache_filename)
-        i += 1
+        features[patient_index] = numpy.load(feature_cache_filename)
+        patient_index += 1
         continue
+# =======
+#     cache_filename = features_path + patient_id + '.npy'
+#     if cache and os.path.isfile(cache_filename):
+#         features[i] = numpy.load(cache_filename)
+#         patient_index += 1
+# >>>>>>> 31028bcae47033275efb192e4ce0c9c1858e3a0c
+#         continue
 
     # Otherwise calculate features for patient
 
@@ -126,12 +137,13 @@ for row in csv_reader:
     # Get 4 phases for patient
     phases = os.listdir(data_dir + patient_dir)
 
-    j=0
+    phase_index = 0
+
     for p_re, cortex in zip(phase_re, phase_type_csv):
         try:
             phase_dir = filter(p_re.match, phases)[0]
         except IndexError:
-            print "Error: Phase "+ phase_dir +" is missing"
+            print "Error: Phase " + phase_dir + " is missing"
             break
         
         # Use mask from .mha file
@@ -237,7 +249,7 @@ for row in csv_reader:
                     roi = numpy.asarray(acc[:])
 
         if max_roi != -float('inf'):
-            max_roi = (max_roi - normalized)/ normalized * 100
+            max_roi = (max_roi - normalized) / normalized * 100
         else:
             # If this failed somehow take 90th percentile and normalize
             max_roi = (numpy.percentile(flat_img_arr, 90) - normalized) / normalized * 100
@@ -248,28 +260,39 @@ for row in csv_reader:
         print "Features - " + tumor_type + ":"
         
         print "#1 - Peak ROI relative intensity:",
-        features[i][j] = max_roi
-        print features[i][j], "%"
+        features[patient_index][phase_index] = max_roi
+        print features[i][phase_index], "%"
         
-        print "#2 - Standard deviation:",
-        features[i][j + num_phases * 1] = numpy.std(flat_img_arr)
-        print features[i][j + num_phases * 1]
+        print "#2 - Entropy:",
+        features[patient_index][phase_index + num_phases * 1] = entropy(flat_img_arr)
+        print features[patient_index][phase_index + num_phases * 1]
         
-        print "#3 - Entropy:",
-        features[i][j + num_phases * 2] = entropy(flat_img_arr)
-        print features[i][j + num_phases * 2]
+        print "#3 - Standard deviation:",
+        features[patient_index][phase_index + num_phases * 2] = numpy.std(flat_img_arr)
+        print features[patient_index][phase_index + num_phases * 2]
         
-        print "#4 - Kurtosis:",
-        features[i][j + num_phases * 3] = scipy.stats.kurtosis(flat_img_arr)
-        print features[i][j + num_phases * 3]
+        print "#4 - Inter-quartile range:",
+        features[patient_index][phase_index + num_phases * 3] = scipy.stats.iqr(flat_img_arr)
+        print features[patient_index][phase_index + num_phases * 3]
         
-        print "#5 - Inter-quartile range:",
-        features[i][j + num_phases * 4] = scipy.stats.iqr(flat_img_arr)
-        print features[i][j + num_phases * 4]
+        print "#5 - Kurtosis:",
+        features[patient_index][phase_index + num_phases * 4] = scipy.stats.kurtosis(flat_img_arr)
+        print features[patient_index][phase_index + num_phases * 4]
+
+        print "#6 - Skew:",
+        features[patient_index][phase_index + num_phases * 5] = scipy.stats.skew(flat_img_arr)
+        print features[patient_index][phase_index + num_phases * 5]
+
+        # print "#7 - 2nd Statistic:",
+        # features[patient_index][phase_index + num_phases * 6] = scipy.stats.kstat(flat_img_arr)
+        # print features[patient_index][phase_index + num_phases * 6]
+
+        phase_index += 1
         
     if cache:
         numpy.save('./featuresLocEqu/'+ patient_id, features[i])
-    i += 1
+    patient_index += 1
+
 
 print "ccRCC mean peak ROI relative attenuation: " + str(numpy.mean(features[truth == 1]))
 print "Oncocytoma mean peak ROI relative attenuation:" + str(numpy.mean(features[truth == 0]))
@@ -308,7 +331,7 @@ classifiers = {
 # Ensure each fold has its own color
 # Can try StratifiedShuffleSplit instead
 cv = StratifiedKFold(n_splits = 5)
-colors = cycle(['green', 'orange', 'blue', 'red'])
+colors = cycle(['green', 'orange', 'blue', 'red', 'brown'])
 
 for classifier in classifiers:
     # ROC evaluation with cross validation taken from scikit-learn
@@ -339,13 +362,15 @@ for classifier in classifiers:
     mean_auc = auc(mean_fpr, mean_tpr)
     std_auc = numpy.std(aucs)
     
+    # Graph shows 95% confidence interval in grey
     std_tpr = numpy.std(tprs, axis = 0)
-    tprs_upper = numpy.minimum(mean_tpr + std_tpr, 1)
-    tprs_lower = numpy.maximum(mean_tpr - std_tpr, 0)
-
+    tprs_upper = numpy.minimum(mean_tpr + 2 * std_tpr, 1)
+    tprs_lower = numpy.maximum(mean_tpr - 2 * std_tpr, 0)
+    
+    plt.fill_between(mean_fpr, tprs_lower, tprs_upper, color = 'grey', alpha = .2, label = '95% Confidence Interval')
+    plt.plot([], [], color='green', linewidth=10)
     plt.plot([0, 1], [0, 1], alpha = 0.8, linestyle='--', lw = 2, color = 'black', label = 'Luck')
-    plt.fill_between(mean_fpr, tprs_lower, tprs_upper, color='grey', alpha=.2, label=r'$\pm$ 1 std. dev.')
-    plt.plot(mean_fpr, mean_tpr, color='darkblue', linestyle='--', label='Mean ROC (AUC = %0.2f %s %0.2f)' % (mean_auc, u'±', std_auc), lw = 4)
+    plt.plot(mean_fpr, mean_tpr, color='darkblue', linestyle='--', label='Mean ROC (AUC = %0.2f %s %0.2f)' % (mean_auc, u'±', 2 * std_auc), lw = 4)
     plt.xlim([-0.05, 1.05])
     plt.ylim([-0.05, 1.05])
     plt.xlabel('False Positive Rate')
