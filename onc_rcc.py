@@ -96,7 +96,7 @@ for row in csv_reader:
     # Use feature cache if set to True and already cached
     cache_filename = features_path + patient_id + '.npy'
     if cache and os.path.isfile(cache_filename):
-        features[i] = numpy.load(cache_filename)
+        features[patient_index] = numpy.load(cache_filename)
         patient_index += 1
         continue
 
