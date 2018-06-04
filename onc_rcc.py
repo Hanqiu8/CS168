@@ -34,10 +34,10 @@ mha_re = re.compile('.*mha$')
 
 # Regex for each phase
 phase_re = [
-    re.compile('.*Pre-contrast.*'),
-    re.compile('.*Corticomedullary.*'),
-    re.compile('.*Nephrtographic.*'),
-    re.compile('.*Excretory.*')
+    re.compile('.*Pre-Contrast.*'),
+    re.compile('.*Coricomedullary.*'),
+    re.compile('.*Nephrographic.*'),
+    re.compile('.*Excret.*')
 ]
 
 # Save path to feature folder
