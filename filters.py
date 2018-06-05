@@ -23,7 +23,7 @@ class ImageFilter:
 	def display(self, pre_im, post_im, z):
 		pylab.imshow(pre_im[z], cmap=pylab.cm.bone)
 		# pylab.imshow(post_im[z], cmap=pylab.cm.bone)
-        pylab.show()
+		pylab.show()
       
 
 	def histoEqualization(self, toShow=False, z = 0):
