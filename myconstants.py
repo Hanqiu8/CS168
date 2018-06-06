@@ -12,7 +12,7 @@ phase_re = [
 data_dir = '/media/hansen/Data/data/'
 
 # Save path to feature folder
-features_path = './featuresHistoEqu/'
+features_path = './featuresLocEqu/'
 
 # Location of normalization value csv
 csv_file_location = './RCC_normalization_values.csv'
@@ -24,7 +24,7 @@ phase_type_csv = [ 'Pre-contrast CORTEX',
 				   'Excretory CORTEX' ]
 
 # Tumor types in csv to binary
-tumor_types = { 'oncocytoma': 0, 'Clear Cell RCC': 1 }
+tumorTypes = { 'oncocytoma': 0, 'Clear Cell RCC': 1 }
 
 # Number of phases used
 num_phases = len(phase_re)

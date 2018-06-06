@@ -48,3 +48,43 @@ class ImageFilter:
 			imgd[i] = deconvolved
 		return imgd
 
+	def truncationROIfinder(mask, masked_img_arr, ):
+		#Taken from work with Heidi
+
+		# Identify lesion
+		non_zeros = np.where(mask!=0)
+		start = non_zeros[0][0]
+		end = non_zeros[0][-1]
+		print "Lesion: "+ str(start) + "-" + str(end)
+
+		#extract 3x3x3 ROI with max intensity
+		max_roi = -float('inf')
+		roi = []
+
+		for z,y,x in zip(non_zeros[0], non_zeros[1], non_zeros[2]):
+		    acc = []
+		    valid = True
+		    
+		    for _z in range(z, min(end, z + 3)):
+		        for _y in range(y, y + 3):
+		            for _x in range(x, x + 3):
+		                if mask[_z][_y][_x] == 0 or masked_img_arr[_z][_y][_x] > 300:
+		                    valid = False
+		                else:
+		                    acc.append(masked_img_arr[_z][_y][_x])
+		    
+		    # Check if we found a new max intesity ROI
+		    if valid and len(acc) >= 9 * (min(end - start, 3)) and len(acc) != 0:
+		        avg = np.mean(np.asarray(acc))
+		        if avg > max_roi:
+		            max_roi = avg
+		            roi = np.asarray(acc[:])
+
+		if max_roi != -float('inf'):
+		    max_roi = (max_roi - normalized) / normalized * 100
+		else:
+		    # If this failed somehow take 90th percentile and normalize
+		    max_roi = (np.percentile(flat_img_arr, 90) - normalized) / normalized * 100
+
+		return max_roi, roi
+

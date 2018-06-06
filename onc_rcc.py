@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 from sklearn import svm
 from sklearn.neural_network import MLPClassifier
@@ -25,6 +24,7 @@ import matplotlib.pyplot as plt, pandas as pd
 
 from filters import *
 from myconstants import *
+from classifiers import *
 
 # Taken from https://www.hdm-stuttgart.de/~maucher/Python/MMCodecs/html/basicFunctions.html
 def entropy(signal):
@@ -53,9 +53,9 @@ num_samples = sum(1 for row in csv_reader) - 1
 csv_file.seek(0) 
 csv_reader.next()
 
-# Set up features and ground truth numpy arrays
+# Set up features and ground actualTum numpy arrays
 features = numpy.zeros((num_samples, num_phases * num_features))
-truth = numpy.zeros(num_samples)
+actualTum = numpy.zeros(num_samples)
 
 # Get all patient directory names
 
@@ -68,34 +68,33 @@ else:
 
 
 # Used to keep track of feature numpy arrays
-patient_index = 0
+patientIndex = 0
 for row in csv_reader:
-    # Get tumor type, patient id, and record ground truth for each patient
-    tumor_type = row[0]
-    patient_id = row[1]
-    truth[patient_index] = tumor_types[tumor_type]
+    # Get tumor type, patient id, and record ground actualTum for each patient
+    tumorClass = row[0]
+    patID = row[1]
+    actualTum[patientIndex] = tumorTypes[tumorClass]
 
     # Use feature cache if set to True and already cached
-    cache_filename = features_path + patient_id + '.npy'
+    cache_filename = features_path + patID + '.npy'
     if cache and os.path.isfile(cache_filename):
-        features[patient_index] = numpy.load(cache_filename)
-        patient_index += 1
+        features[patientIndex] = numpy.load(cache_filename)
+        patientIndex += 1
         continue
 
-    # Otherwise calculate features for patient
-
-    # Match patient_id with patient data folder
-    patient_re = re.compile('.*' + patient_id + '.*')
+    # Match patID with patient data
+    patient_re = re.compile('.*' + patID + '.*')
     try:
         patient_dir = filter(patient_re.match, patients)[0]
     except IndexError:
-        print "Error: Folder " + patient_id + " is not in data folder"
+        print "Error: Folder " + patID + " is not in data folder"
         continue
    
     phases = os.listdir(data_dir + patient_dir)
     phase_index = 0
     for p_re, cortex in zip(phase_re, phase_type_csv):
         phase_dir = filter(p_re.match, phases)[0]
+
         
         
         # Grabbing mask
@@ -106,195 +105,83 @@ for row in csv_reader:
             print "Error: .mha file at " + maskLoc + " is missing!"
             break
         
-        print " "
+        print "     "
         
         full_path = maskLoc + '/' + maskLabel
         print "Getting  data from " + full_path
         
         mask = sitk.GetArrayFromImage(sitk.ReadImage(full_path))
 
-        # Raw image
+        # grab image
         imgNames = itk_reader.GetGDCMSeriesFileNames(maskLoc + '/images')
         itk_reader.SetFileNames(imgNames)
-        
-        # Flip z axis for DICOM
         pre_img = numpy.flipud(sitk.GetArrayFromImage(itk_reader.Execute()))
 
-        # Filter Image
+        # filter Image
         im_filter = ImageFilter(pre_img)
+        # img = pre_img
         img = im_filter.histoEqualization(toShow=False, z = 0)
-        
-
         # img = im_filter.deconvolution()
 
-                #find normalized cortex values to facilitate computation of relative enhancement
+        #get normalized values
         normalized = 0
-        if patient_id in csv_dataframe.index.values:
-            normalized = csv_dataframe.loc[patient_id, cortex]
+        if patID in csv_dataframe.index.values:
+            normalized = csv_dataframe.loc[patID, cortex]
         else:
-            print 'Error: No normalized value for: ' + patient_id
+            print 'Error: No normalized value for: ' + patID
             break
 
-        # Identify lesion
-        non_zeros = numpy.where(mask!=0)
-        start = non_zeros[0][0]
-        end = non_zeros[0][-1]
-        print "Lesion: "+ str(start) + "-" + str(end)
 
-        # Segment lesion
-        masked_img_arr = numpy.multiply(img, mask)
-        flat_img_arr = numpy.ndarray.flatten(img[mask!=0])
+        maskedImgs = numpy.multiply(img, mask)
+        flatImgs = numpy.ndarray.flatten(img[mask!=0])
 
-        #extract 3x3x3 ROI with max intensity
-        max_roi = -float('inf')
-        roi = []
-        
-        for z,y,x in zip(non_zeros[0], non_zeros[1], non_zeros[2]):
-            acc = []
-            valid = True
-            
-            for _z in range(z, min(end, z + 3)):
-                for _y in range(y, y + 3):
-                    for _x in range(x, x + 3):
-                        if mask[_z][_y][_x] == 0 or masked_img_arr[_z][_y][_x] > 300:
-                            valid = False
-                        else:
-                            acc.append(masked_img_arr[_z][_y][_x])
-            
-            # Check if we found a new max intesity ROI
-            if valid and len(acc) >= 9 * (min(end - start, 3)) and len(acc) != 0:
-                avg = numpy.mean(numpy.asarray(acc))
-                if avg > max_roi:
-                    max_roi = avg
-                    roi = numpy.asarray(acc[:])
+        max_roi, roi = im_filter.truncationROIfinder(mask, maskedImgs)
 
-        if max_roi != -float('inf'):
-            max_roi = (max_roi - normalized) / normalized * 100
-        else:
-            # If this failed somehow take 90th percentile and normalize
-            max_roi = (numpy.percentile(flat_img_arr, 90) - normalized) / normalized * 100
 
         print "ROI Intensity:"
         print roi
 
-        print "Features - " + tumor_type + ":"
+        print "Features - " + tumorClass + ":"
         
         print "#1: Peak ROI relative intensity:",
-        features[patient_index][phase_index] = max_roi
-        print features[patient_index][phase_index], "%"
+        features[patientIndex][phase_index] = max_roi
+        print features[patientIndex][phase_index], "%"
         
         print "#2: Entropy:",
-        features[patient_index][phase_index + num_phases * 1] = entropy(flat_img_arr)
-        print features[patient_index][phase_index + num_phases * 1]
+        features[patientIndex][phase_index + num_phases * 1] = entropy(flatImgs)
+        print features[patientIndex][phase_index + num_phases * 1]
         
         print "#3: Standard deviation:",
-        features[patient_index][phase_index + num_phases * 2] = numpy.std(flat_img_arr)
-        print features[patient_index][phase_index + num_phases * 2]
+        features[patientIndex][phase_index + num_phases * 2] = numpy.std(flatImgs)
+        print features[patientIndex][phase_index + num_phases * 2]
         
         print "#4: Inter-quartile range:",
-        features[patient_index][phase_index + num_phases * 3] = scipy.stats.iqr(flat_img_arr)
-        print features[patient_index][phase_index + num_phases * 3]
+        features[patientIndex][phase_index + num_phases * 3] = scipy.stats.iqr(flatImgs)
+        print features[patientIndex][phase_index + num_phases * 3]
         
         print "#5: Kurtosis:",
-        features[patient_index][phase_index + num_phases * 4] = scipy.stats.kurtosis(flat_img_arr)
-        print features[patient_index][phase_index + num_phases * 4]
+        features[patientIndex][phase_index + num_phases * 4] = scipy.stats.kurtosis(flatImgs)
+        print features[patientIndex][phase_index + num_phases * 4]
 
         print "#6: Skew:",
-        features[patient_index][phase_index + num_phases * 5] = scipy.stats.skew(flat_img_arr)
-        print features[patient_index][phase_index + num_phases * 5]
+        features[patientIndex][phase_index + num_phases * 5] = scipy.stats.skew(flatImgs)
+        print features[patientIndex][phase_index + num_phases * 5]
 
         # print "#7 - 2nd Statistic:",
-        # features[patient_index][phase_index + num_phases * 6] = scipy.stats.kstat(flat_img_arr)
-        # print features[patient_index][phase_index + num_phases * 6]
+        # features[patientIndex][phase_index + num_phases * 6] = scipy.stats.kstat(flatImgs)
+        # print features[patientIndex][phase_index + num_phases * 6]
 
         phase_index += 1
         
     if cache:
-        numpy.save(features_path + patient_id, features[patient_index])
-    patient_index += 1
+        numpy.save(features_path + patID, features[patientIndex])
+    patientIndex += 1
 
-print "ccRCC mean peak ROI relative attenuation: " + str(numpy.mean(features[truth == 1]))
-print "Oncocytoma mean peak ROI relative attenuation:" + str(numpy.mean(features[truth == 0]))
+print "ccRCC mean peak ROI relative attenuation: " + str(numpy.mean(features[actualTum == 1]))
+print "Oncocytoma mean peak ROI relative attenuation:" + str(numpy.mean(features[actualTum == 0]))
 
 print "===Training==="
 
-# Could use GridSearchCV to pick params for each
-
-classifiers = {
-    "K Nearest Neighbors": KNeighborsClassifier(n_neighbors = 7, algorithm = "auto"),
-    "SVC (Linear Kernel)": SVC(kernel = "linear", C = 0.01, probability = True),
-    "SVC": SVC(C = 0.01, probability = True),
-    "Gaussian Process": GaussianProcessClassifier(1.0 * RBF(1.0), warm_start = True),
-    "Decision Tree": DecisionTreeClassifier(max_depth = 1),
-    "Random Forest": RandomForestClassifier(max_depth = 2, n_estimators = 5, random_state = 1),
-    "Multi-layer Perception": MLPClassifier(hidden_layer_sizes = (15,15,), alpha = 0.1, activation = 'tanh', solver = 'lbfgs'),
-    "AdaBoost": AdaBoostClassifier(n_estimators = 5),
-    "Gaussian Naive-bayes": GaussianNB(),
-    "Gradient Boosting": GradientBoostingClassifier(n_estimators = 10, learning_rate = 1.0, max_depth = 1, random_state = 0),
-    # Using Voting Classifier to perform majority vote
-    "Voting Classifier": VotingClassifier(
-        estimators = [
-            ("K Nearest Neighbors", KNeighborsClassifier(n_neighbors = 7, algorithm = "auto")),
-            ("SVC (Linear Kernel)", SVC(kernel = "linear", C = 0.01, probability = True)),
-            ( "SVC", SVC(C = 0.01, probability = True)),
-            ("Gaussian Process", GaussianProcessClassifier(1.0 * RBF(1.0), warm_start=True)),
-            ("Decision Tree", DecisionTreeClassifier(max_depth = 1)),
-            ("Random Forest", RandomForestClassifier(max_depth = 2, n_estimators = 5, random_state = 1)),
-            ("Multi-layer Perception", MLPClassifier(hidden_layer_sizes = (15, 15, ), alpha = 0.1, activation = 'tanh', solver = 'lbfgs')),
-            ("AdaBoost", AdaBoostClassifier(n_estimators = 5)),
-            ("Gaussian Naive-bayes", GaussianNB()),
-            ("Gradient Boosting", GradientBoostingClassifier(n_estimators = 10, learning_rate = 1.0, max_depth = 1, random_state = 0)),
-        ], voting = 'soft', flatten_transform = True)
-}
-
-# Ensure each fold has its own color
-# Can try StratifiedShuffleSplit instead
-cv = StratifiedKFold(n_splits = 5)
-colors = cycle(['green', 'orange', 'blue', 'red', 'brown'])
-
-for classifier in classifiers:
-    # ROC evaluation with cross validation taken from scikit-learn
-    # http://scikit-learn.org/stable/auto_examples/model_selection/plot_roc_crossval.html#sphx-glr-auto-examples-model-selection-plot-roc-crossval-py
-    i = 0
-    tprs = []
-    aucs = []
-    mean_fpr = numpy.linspace(0,1,100)
-    print "Training " + classifier
-    for (train, test), color in zip(cv.split(features,truth), colors):
-        # print "# Train # Test: " + str(len(train)), str(len(test))
-        probs = classifiers[classifier].fit(features[train], truth[train]).predict_proba(features[test])
-        
-        # Get ROC curve
-        fpr, tpr, thresholds = roc_curve(truth[test], probs[:,1])
-        tprs.append(interp(mean_fpr, fpr, tpr))
-        tprs[-1][0] = 0.0
-        roc_auc = auc(fpr,tpr)
-        aucs.append(roc_auc)
-        plt.plot(fpr, tpr, lw = 2, alpha = 0.4, color = color, label='Fold: %d (AUC = %0.2f)' % (i, roc_auc))
-        i += 1
-    
-    print "Graph for " + classifier + ":"
-    
-    # Final alterations before plotting
-    mean_tpr = numpy.mean(tprs, axis = 0)
-    mean_tpr[-1] = 1.0
-    mean_auc = auc(mean_fpr, mean_tpr)
-    std_auc = numpy.std(aucs)
-    
-    # Graph shows 95% confidence interval in grey
-    std_tpr = numpy.std(tprs, axis = 0)
-    tprs_upper = numpy.minimum(mean_tpr + 2 * std_tpr, 1)
-    tprs_lower = numpy.maximum(mean_tpr - 2 * std_tpr, 0)
-    
-    plt.fill_between(mean_fpr, tprs_lower, tprs_upper, color = 'grey', alpha = .2, label = '95% Confidence Interval')
-    plt.plot([], [], color='green', linewidth=10)
-    plt.plot([0, 1], [0, 1], alpha = 0.8, linestyle='--', lw = 2, color = 'black', label = 'Luck')
-    plt.plot(mean_fpr, mean_tpr, color='darkblue', linestyle='--', label='Mean ROC (AUC = %0.2f %s %0.2f)' % (mean_auc, u'±', 2 * std_auc), lw = 4)
-    plt.xlim([-0.05, 1.05])
-    plt.ylim([-0.05, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('ROC for ' + classifier + '\n Oncocytoma vs. Clear Cell RCC')
-    plt.legend(loc = "lower right")
-    plt.subplots_adjust(top = 0.85)
-    plt.show()
+cf = imgClassifier()
+print "here"
+cf.classify_and_plot(features, actualTum)
