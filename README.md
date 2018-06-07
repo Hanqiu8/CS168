@@ -5,11 +5,14 @@
 We recieved all of our data from Heidi Coy. 
 The files are too large to submit on ccle, so they are available upon request.
 She gave us a folder of CT images along with a .csv with normalization values.
+Note: as time progresses, it is possible this data set will vary. As such
+it is possible that results or code performace will vary. 
 
 ### Dependencies
 We wrote our project in python, so be sure to have python 2.7 installed. 
 On top of python, we used numerous libraries to perform our classification. 
-They are listed below with a brief explanation of what they were used for.
+They are listed below with a brief explanation of what they were used for. 
+You may have to update these dependencies to ensure everything works correctly.
 
 - scikit-learn: Utilized numerous classifiers and analysis metrics
 - scikit-image: Performed filtering on our raw images
@@ -42,3 +45,4 @@ Third, to save features create an empty feature folder and put its location in "
 	Note: Use the "cache" variable to decide whether or not you want to use (and cache) the feature results.
 Fourth, put the RCC_normalization_values.csv location in "csv_file_location" in myconstants.py.
 Finally, run onc_rcc.py using python 2.7 to see the features extracted, as well as models trained and analyzed.
+
