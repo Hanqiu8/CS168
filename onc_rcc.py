@@ -1,26 +1,6 @@
-# -*- coding: utf-8 -*-
-from sklearn import svm
-from sklearn.neural_network import MLPClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import SVC
-from sklearn.gaussian_process import GaussianProcessClassifier
-from sklearn.gaussian_process.kernels import RBF
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier, VotingClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
-from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit, GridSearchCV
-from sklearn.metrics import roc_curve, auc
-from itertools import cycle
-from skimage.util import img_as_ubyte
-from skimage.filters.rank import entropy
-from skimage.morphology import disk
-from skimage.feature import hog
-from skimage import data, exposure
-
 from scipy import interp, stats
 import SimpleITK as sitk, numpy, scipy.io, scipy.ndimage, pylab, os, re, csv, math
-import matplotlib.pyplot as plt, pandas as pd
+import pandas as pd
 
 from filters import *
 from myconstants import *
@@ -66,7 +46,6 @@ else:
     print "Data directory is wrong! Crashing now"
     exit()
 
-
 # Used to keep track of feature numpy arrays
 patientIndex = 0
 for row in csv_reader:
@@ -94,8 +73,6 @@ for row in csv_reader:
     phase_index = 0
     for p_re, cortex in zip(phase_re, phase_type_csv):
         phase_dir = filter(p_re.match, phases)[0]
-
-        
         
         # Grabbing mask
         try:
@@ -131,12 +108,10 @@ for row in csv_reader:
             print 'Error: No normalized value for: ' + patID
             break
 
-
         maskedImgs = numpy.multiply(img, mask)
         flatImgs = numpy.ndarray.flatten(img[mask!=0])
 
         max_roi, roi = im_filter.truncationROIfinder(mask, maskedImgs)
-
 
         print "ROI Intensity:"
         print roi
@@ -167,6 +142,7 @@ for row in csv_reader:
         features[patientIndex][phase_index + num_phases * 5] = scipy.stats.skew(flatImgs)
         print features[patientIndex][phase_index + num_phases * 5]
 
+        # Decided to not use this feature in final classifier
         # print "#7 - 2nd Statistic:",
         # features[patientIndex][phase_index + num_phases * 6] = scipy.stats.kstat(flatImgs)
         # print features[patientIndex][phase_index + num_phases * 6]
@@ -183,5 +159,4 @@ print "Oncocytoma mean peak ROI relative attenuation:" + str(numpy.mean(features
 print "===Training==="
 
 cf = imgClassifier()
-print "here"
 cf.classify_and_plot(features, actualTum)

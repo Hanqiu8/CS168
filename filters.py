@@ -1,6 +1,5 @@
 import numpy as np
 import pylab
-
 from skimage import data, color, data, exposure, restoration, feature
 from skimage.util.dtype import dtype_range
 from skimage.util import img_as_ubyte
@@ -10,8 +9,6 @@ from itertools import cycle
 from skimage.util import img_as_ubyte
 from skimage.filters.rank import entropy
 from skimage.morphology import disk
-
-
 from scipy.signal import convolve2d as conv2
 
 class ImageFilter:

@@ -12,10 +12,9 @@ from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit, GridSearchCV
 from sklearn.metrics import roc_curve, auc
 from itertools import cycle
-
 from scipy import interp, stats
 import SimpleITK as sitk, numpy, scipy.io, scipy.ndimage, pylab, os, re, csv, math
-import matplotlib.pyplot as plt, pandas as pd
+import matplotlib.pyplot as plt
 
 class imgClassifier:
 
@@ -23,30 +22,30 @@ class imgClassifier:
 		return
 	def classify_and_plot(self,features, truth):
 		classifiers = {
-	    "K Nearest Neighbors": KNeighborsClassifier(n_neighbors = 7, algorithm = "auto"),
-	    "SVC (Linear Kernel)": SVC(kernel = "linear", C = 0.01, probability = True),
-	    "SVC": SVC(C = 0.01, probability = True),
-	    "Gaussian Process": GaussianProcessClassifier(1.0 * RBF(1.0), warm_start = True),
-	    "Decision Tree": DecisionTreeClassifier(max_depth = 1),
-	    "Random Forest": RandomForestClassifier(max_depth = 2, n_estimators = 5, random_state = 1),
-	    "Multi-layer Perception": MLPClassifier(hidden_layer_sizes = (15,15,), alpha = 0.1, activation = 'tanh', solver = 'lbfgs'),
-	    "AdaBoost": AdaBoostClassifier(n_estimators = 5),
-	    "Gaussian Naive-bayes": GaussianNB(),
-	    "Gradient Boosting": GradientBoostingClassifier(n_estimators = 10, learning_rate = 1.0, max_depth = 1, random_state = 0),
-	    # Using Voting Classifier to perform majority vote
-	    "Voting Classifier": VotingClassifier(
-	        estimators = [
-	            ("K Nearest Neighbors", KNeighborsClassifier(n_neighbors = 7, algorithm = "auto")),
-	            ("SVC (Linear Kernel)", SVC(kernel = "linear", C = 0.01, probability = True)),
-	            ( "SVC", SVC(C = 0.01, probability = True)),
-	            ("Gaussian Process", GaussianProcessClassifier(1.0 * RBF(1.0), warm_start=True)),
-	            ("Decision Tree", DecisionTreeClassifier(max_depth = 1)),
-	            ("Random Forest", RandomForestClassifier(max_depth = 2, n_estimators = 5, random_state = 1)),
-	            ("Multi-layer Perception", MLPClassifier(hidden_layer_sizes = (15, 15, ), alpha = 0.1, activation = 'tanh', solver = 'lbfgs')),
-	            ("AdaBoost", AdaBoostClassifier(n_estimators = 5)),
-	            ("Gaussian Naive-bayes", GaussianNB()),
-	            ("Gradient Boosting", GradientBoostingClassifier(n_estimators = 10, learning_rate = 1.0, max_depth = 1, random_state = 0)),
-	        ], voting = 'soft', flatten_transform = True)
+		    "K Nearest Neighbors": KNeighborsClassifier(n_neighbors = 7, algorithm = "auto"),
+		    "SVC (Linear Kernel)": SVC(kernel = "linear", C = 0.01, probability = True),
+		    "SVC": SVC(C = 0.01, probability = True),
+		    "Gaussian Process": GaussianProcessClassifier(1.0 * RBF(1.0), warm_start = True),
+		    "Decision Tree": DecisionTreeClassifier(max_depth = 1),
+		    "Random Forest": RandomForestClassifier(max_depth = 2, n_estimators = 5, random_state = 1),
+		    "Multi-layer Perception": MLPClassifier(hidden_layer_sizes = (15,15,), alpha = 0.1, activation = 'tanh', solver = 'lbfgs'),
+		    "AdaBoost": AdaBoostClassifier(n_estimators = 5),
+		    "Gaussian Naive-bayes": GaussianNB(),
+		    "Gradient Boosting": GradientBoostingClassifier(n_estimators = 10, learning_rate = 1.0, max_depth = 1, random_state = 0),
+		    # Using Voting Classifier to perform majority vote, but also want to see each classifier individually
+		    "Voting Classifier": VotingClassifier(
+		        estimators = [
+		            ("K Nearest Neighbors", KNeighborsClassifier(n_neighbors = 7, algorithm = "auto")),
+		            ("SVC (Linear Kernel)", SVC(kernel = "linear", C = 0.01, probability = True)),
+		            ( "SVC", SVC(C = 0.01, probability = True)),
+		            ("Gaussian Process", GaussianProcessClassifier(1.0 * RBF(1.0), warm_start=True)),
+		            ("Decision Tree", DecisionTreeClassifier(max_depth = 1)),
+		            ("Random Forest", RandomForestClassifier(max_depth = 2, n_estimators = 5, random_state = 1)),
+		            ("Multi-layer Perception", MLPClassifier(hidden_layer_sizes = (15, 15, ), alpha = 0.1, activation = 'tanh', solver = 'lbfgs')),
+		            ("AdaBoost", AdaBoostClassifier(n_estimators = 5)),
+		            ("Gaussian Naive-bayes", GaussianNB()),
+		            ("Gradient Boosting", GradientBoostingClassifier(n_estimators = 10, learning_rate = 1.0, max_depth = 1, random_state = 0)),
+		        ], voting = 'soft', flatten_transform = True)
 		}
 
 		# Ensure each fold has its own color
@@ -63,7 +62,6 @@ class imgClassifier:
 			mean_fpr = numpy.linspace(0,1,100)
 			print "Training " + classifier
 			for (train, test), color in zip(cv.split(features,truth), colors):
-			    # print "# Train # Test: " + str(len(train)), str(len(test))
 			    temp = classifiers[classifier].fit(features[train], truth[train])
 			    probs = temp.predict_proba(features[test])
 			    # Get ROC curve
