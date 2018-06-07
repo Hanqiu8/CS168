@@ -45,7 +45,7 @@ class ImageFilter:
 			imgd[i] = deconvolved
 		return imgd
 
-	def truncationROIfinder(mask, masked_img_arr, ):
+	def truncationROIfinder(self, mask, masked_img_arr, normalized ):
 		#Taken from work with Heidi
 
 		# Identify lesion

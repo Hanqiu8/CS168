@@ -159,4 +159,4 @@ print "Oncocytoma mean peak ROI relative attenuation:" + str(numpy.mean(features
 print "===Training==="
 
 cf = imgClassifier()
-cf.classify_and_plot(features, actualTum)
+cf.classify_and_plot(features, actualTum, normalized)
