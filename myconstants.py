@@ -33,4 +33,4 @@ num_phases = len(phase_re)
 num_features = 6
 
 # Decides to use cache features
-cache = False
+cache = True

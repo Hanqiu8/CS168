@@ -157,4 +157,4 @@ for row in csv_reader:
 print "===Training==="
 
 cf = imgClassifier()
-cf.classify_and_plot(features, actualTum, normalized)
+cf.classify_and_plot(features, actualTum)
