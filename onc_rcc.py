@@ -111,7 +111,7 @@ for row in csv_reader:
         maskedImgs = numpy.multiply(img, mask)
         flatImgs = numpy.ndarray.flatten(img[mask!=0])
 
-        max_roi, roi = im_filter.truncationROIfinder(mask, maskedImgs, normalized)
+        max_roi, roi = im_filter.truncationROIfinder(mask, maskedImgs, normalized, flatImgs)
 
         # Use for debugging purposes
         # print "ROI Intensity:"

@@ -45,7 +45,7 @@ class ImageFilter:
 			imgd[i] = deconvolved
 		return imgd
 
-	def truncationROIfinder(self, mask, masked_img_arr, normalized ):
+	def truncationROIfinder(self, mask, masked_img_arr, normalized, flatImgs ):
 		#Taken from work with Heidi
 
 		# Identify lesion
@@ -82,7 +82,7 @@ class ImageFilter:
 		    max_roi = (max_roi - normalized) / normalized * 100
 		else:
 		    # If this failed somehow take 90th percentile and normalize
-		    max_roi = (np.percentile(flat_img_arr, 90) - normalized) / normalized * 100
+		    max_roi = (np.percentile(flatImgs, 90) - normalized) / normalized * 100
 
 		return max_roi, roi
 
