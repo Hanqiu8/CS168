@@ -52,7 +52,8 @@ class ImageFilter:
 		non_zeros = np.where(mask!=0)
 		start = non_zeros[0][0]
 		end = non_zeros[0][-1]
-		print "Lesion: "+ str(start) + "-" + str(end)
+		# Use for debugging
+		# print "Lesion: "+ str(start) + "-" + str(end)
 
 		#extract 3x3x3 ROI with max intensity
 		max_roi = -float('inf')

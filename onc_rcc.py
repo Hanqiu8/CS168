@@ -111,10 +111,11 @@ for row in csv_reader:
         maskedImgs = numpy.multiply(img, mask)
         flatImgs = numpy.ndarray.flatten(img[mask!=0])
 
-        max_roi, roi = im_filter.truncationROIfinder(mask, maskedImgs)
+        max_roi, roi = im_filter.truncationROIfinder(mask, maskedImgs, normalized)
 
-        print "ROI Intensity:"
-        print roi
+        # Use for debugging purposes
+        # print "ROI Intensity:"
+        # print roi
 
         print "Features - " + tumorClass + ":"
         
@@ -152,9 +153,6 @@ for row in csv_reader:
     if cache:
         numpy.save(features_path + patID, features[patientIndex])
     patientIndex += 1
-
-print "ccRCC mean peak ROI relative attenuation: " + str(numpy.mean(features[actualTum == 1]))
-print "Oncocytoma mean peak ROI relative attenuation:" + str(numpy.mean(features[actualTum == 0]))
 
 print "===Training==="
 

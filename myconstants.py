@@ -9,10 +9,10 @@ phase_re = [
 ]
 
 # Location of image data
-data_dir = '/media/hansen/Data/data/'
+data_dir = '../data/'
 
 # Save path to feature folder
-features_path = './featuresLocEqu/'
+features_path = '../features/'
 
 # Location of normalization value csv
 csv_file_location = './RCC_normalization_values.csv'
@@ -33,4 +33,4 @@ num_phases = len(phase_re)
 num_features = 6
 
 # Decides to use cache features
-cache = True
+cache = False
