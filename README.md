@@ -1,6 +1,11 @@
 # UCLA CS168 - Computational Methods for Medical Imaging
 # Connor Kenny (304437322) and Hansen Qiu (004490085)
 
+### Data
+We recieved all of our data from Heidi Coy. 
+The files are too large to submit on ccle, so they are available upon request.
+She gave us a folder of CT images along with a .csv with normalization values.
+
 ### Dependencies
 We wrote our project in python, so be sure to have python 2.7 installed. 
 On top of python, we used numerous libraries to perform our classification. 
