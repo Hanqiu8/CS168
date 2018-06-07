@@ -34,5 +34,6 @@ Since we modularized our approach, running our classification is quite simple.
 First, be sure to acquire the data and put the location of the data directory in "data_dir" in myconstants.py.
 Second, make sure to have all dependencies downloaded and updated.
 Third, to save features create an empty feature folder and put its location in "features_path" in myconstants.py.
+	Note: Use the "cache" variable to decide whether or not you want to use (and cache) the feature results.
 Fourth, put the RCC_normalization_values.csv location in "csv_file_location" in myconstants.py.
 Finally, run onc_rcc.py using python 2.7 to see the features extracted, as well as models trained and analyzed.
